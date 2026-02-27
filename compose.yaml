@@ -1,0 +1,89 @@
+# syntax=docker/compose:1.29.0
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+      cache_from:
+        - type=gha
+    container_name: finanalytix-backend
+    init: true
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finanalytix
+      - PYTHONUNBUFFERED=1
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    restart: unless-stopped
+    networks:
+      - finanalytix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runner
+      cache_from:
+        - type=gha
+    container_name: finanalytix-frontend
+    init: true
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    restart: unless-stopped
+    networks:
+      - finanalytix-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  db:
+    image: postgres:16-alpine
+    container_name: finanalytix-db
+    init: true
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=finanalytix
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finanalytix-network
+    ports:
+      - "5432:5432"
+
+volumes:
+  db-data:
+    driver: local
+
+networks:
+  finanalytix-network:
+    driver: bridge
