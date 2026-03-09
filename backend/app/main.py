@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     simulation,
     mexico,
     advanced,
+    accounting,
 )
 from app.db.database import engine, Base
 
@@ -79,6 +80,8 @@ app.include_router(mexico.router, prefix="/api/v1/mexico", tags=["México - CFDI
 app.include_router(
     advanced.router, prefix="/api/v1/advanced", tags=["Indicadores Avanzados"]
 )
+
+app.include_router(accounting.router, prefix="/api/v1/accounting", tags=["Contabilidad CFDI"])
 
 
 if __name__ == "__main__":
